@@ -3,8 +3,10 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSObject;
 import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.Payload;
 import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.crypto.bc.BouncyCastleFIPSProviderSingleton;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
@@ -15,6 +17,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +42,7 @@ public class JWTSigner {
         return keys;
     }
 
-    public void signJWT(PrivateKey privateKey, PublicKey publicKey) throws JOSEException {
+    public void signJWT(PrivateKey privateKey, RSAPublicKey publicKey) throws JOSEException {
 
         JWSSigner signer = new RSASSASigner(privateKey);
         signer.getJCAContext().setProvider(BouncyCastleFIPSProviderSingleton.getInstance());
@@ -49,10 +52,15 @@ public class JWTSigner {
                 new Payload("{\"acquirer_response_code\": \"00\",\"initiator_trace_id\": \"281\"}"));
 
         jwsObject.sign(signer);
-        jwsObject.serialize();
 
-        System.out.println("JWT Signed! " + jwsObject.serialize());
 
+        // Create RSA verifier and set BC FIPS provider
+        JWSVerifier verifier = new RSASSAVerifier(publicKey);
+        verifier.getJCAContext().setProvider(BouncyCastleFIPSProviderSingleton.getInstance());
+
+        jwsObject.verify(verifier);
+
+        System.out.println("JWT Signed! - "+ jwsObject.verify(verifier) +" " + jwsObject.serialize());
 
         //*********************//
 

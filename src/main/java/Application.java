@@ -1,5 +1,6 @@
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Map;
 
 public class Application {
@@ -9,7 +10,7 @@ public class Application {
 
         Map<String, Object> rsaKeys = JWTSigner.getRSAKeys();
 
-        PublicKey publicKey = (PublicKey) rsaKeys.get("public");
+        RSAPublicKey publicKey = (RSAPublicKey) rsaKeys.get("public");
         PrivateKey privateKey = (PrivateKey) rsaKeys.get("private");
 
         JWTSigner jwtSigner = new JWTSigner();

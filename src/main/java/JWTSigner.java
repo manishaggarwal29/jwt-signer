@@ -8,6 +8,7 @@ import com.nimbusds.jose.Payload;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.crypto.bc.BouncyCastleFIPSProviderSingleton;
+import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -17,10 +18,12 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 
 public class JWTSigner {
@@ -44,12 +47,22 @@ public class JWTSigner {
 
     public void signJWT(PrivateKey privateKey, RSAPublicKey publicKey) throws JOSEException {
 
+        //Approach 1:
         JWSSigner signer = new RSASSASigner(privateKey);
         signer.getJCAContext().setProvider(BouncyCastleFIPSProviderSingleton.getInstance());
 
+        // Prepare JWT with claims set
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("poc")
+                .issuer("https://abc.com")
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
+                .claim("acquirer_response_code","00")
+                .claim("initiator_trace_id","281")
+                .build();
+
         JWSObject jwsObject = new JWSObject(
                 new JWSHeader.Builder(JWSAlgorithm.PS256).build(),
-                new Payload("{\"acquirer_response_code\": \"00\",\"initiator_trace_id\": \"281\"}"));
+                claimsSet.toPayload());
 
         jwsObject.sign(signer);
 
@@ -64,27 +77,33 @@ public class JWTSigner {
 
         //*********************//
 
+        //Approach 2:
         // RSA signatures require a public and private RSA key pair, the public key
         // must be made known to the JWS recipient in order to verify the signatures
         RSAKey rsaJWK = new RSAKeyGenerator(2048)
-                .keyID("123")
+                .keyID(UUID.randomUUID().toString())
+                .keyUse(KeyUse.SIGNATURE)
+                .algorithm(JWSAlgorithm.PS256)
                 .generate();
+
         RSAKey rsaPublicJWK = rsaJWK.toPublicJWK();
+        PublicKey publicKey1 = rsaJWK.toPublicKey();
+        RSAPublicKey rsaPublicKey = rsaJWK.toRSAPublicKey();
+        PrivateKey privateKey1 = rsaJWK.toPrivateKey();
+        RSAPrivateKey rsaPrivateKey = rsaJWK.toRSAPrivateKey();
+
+        System.out.println("rsaPublicJWK : " + rsaPublicJWK);
+        System.out.println("publicKey1 : " + publicKey1);
+        System.out.println("rsaPublicKey : " + rsaPublicKey);
+        System.out.println("privateKey1 : " + privateKey1);
+        System.out.println("rsaPrivateKey : " + rsaPrivateKey);
 
         // Create RSA-signer with the private key
         JWSSigner signer1 = new RSASSASigner(rsaJWK);
-
-        // Prepare JWT with claims set
-        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
-                .subject("alice")
-                .issuer("https://c2id.com")
-                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
-                .claim("acquirer_response_code","00")
-                .claim("initiator_trace_id","281")
-                .build();
+        signer.getJCAContext().setProvider(BouncyCastleFIPSProviderSingleton.getInstance());
 
         SignedJWT signedJWT = new SignedJWT(
-                new JWSHeader.Builder(JWSAlgorithm.PS256).keyID(rsaJWK.getKeyID()).build(),
+                new JWSHeader.Builder(JWSAlgorithm.PS256).keyID(rsaJWK.getKeyID()).jwk(rsaPublicJWK).build(),
                 claimsSet);
 
         // Compute the RSA signature
